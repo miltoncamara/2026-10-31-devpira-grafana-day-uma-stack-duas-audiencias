@@ -1,0 +1,159 @@
+:root {
+  --gd-dark: #11161d;
+  --gd-light: #f3f1eb;
+  --gd-ink: #161b22;
+  --gd-soft: #4a5260;
+  --gd-soft-dark: #aeb8c4;
+  --gd-accent: #a44a12;
+  --gd-accent-dark: #f2994a;
+  --gd-blue: #2f6fa3;
+  --gd-card: #fbfaf6;
+  --gd-line: #dcd8ce;
+}
+
+.slidev-layout {
+  font-family: 'IBM Plex Sans', Arial, sans-serif;
+}
+
+/* Fundos */
+.slidev-layout.light {
+  background: var(--gd-light);
+  color: var(--gd-ink);
+}
+.slidev-layout.dark {
+  background: var(--gd-dark);
+  color: var(--gd-light);
+}
+.slidev-layout.accent {
+  background: var(--gd-accent);
+  color: #fbf4ec;
+}
+
+/* Tipografia */
+.slidev-layout h1,
+.slidev-layout h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
+}
+.slidev-layout h2 {
+  font-size: 2.1rem;
+}
+.slidev-layout.light h1,
+.slidev-layout.light h2 {
+  color: var(--gd-ink);
+}
+
+.slidev-layout .eyebrow {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gd-accent);
+}
+.slidev-layout.dark .eyebrow {
+  color: var(--gd-accent-dark);
+}
+.slidev-layout .eyebrow.blue {
+  color: var(--gd-blue);
+}
+
+.slidev-layout .statement {
+  font-size: 3.4rem;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.slidev-layout .big {
+  font-size: 6rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gd-accent);
+}
+
+.slidev-layout .label {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gd-soft);
+}
+.slidev-layout .label.accent {
+  color: var(--gd-accent);
+}
+
+.slidev-layout .soft {
+  color: var(--gd-soft);
+}
+.slidev-layout.dark .soft {
+  color: var(--gd-soft-dark);
+}
+.slidev-layout .hl {
+  color: var(--gd-accent-dark);
+}
+
+.slidev-layout .mono {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* Especificidade baixa para não anular os utilitários mt-* */
+:where(.slidev-layout) p {
+  margin: 0;
+}
+/* O tema default deixa o parágrafo após h1/h2 com opacidade reduzida */
+.slidev-layout h1 + p,
+.slidev-layout h2 + p {
+  opacity: 1;
+}
+
+/* Blocos */
+.slidev-layout .card {
+  background: var(--gd-card);
+  border: 1px solid var(--gd-line);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+.slidev-layout .card-top {
+  background: var(--gd-card);
+  border-top: 4px solid var(--gd-blue);
+  border-radius: 0 0 12px 12px;
+  padding: 1.25rem 1.5rem;
+}
+.slidev-layout .card-top.biz {
+  border-top-color: var(--gd-accent);
+}
+.slidev-layout .pill {
+  display: inline-block;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  color: var(--gd-light);
+}
+
+.slidev-layout .footnote {
+  position: absolute;
+  left: 3.5rem;
+  bottom: 1.4rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: #6a707a;
+}
+
+.slidev-layout .avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--gd-accent-dark);
+}
+
+.slidev-layout .qr {
+  border-radius: 12px;
+}
+
+/* Código dentro de slides claros continua em caixa escura */
+.slidev-layout.light .slidev-code-wrapper {
+  border-radius: 10px;
+}
