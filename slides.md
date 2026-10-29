@@ -17,7 +17,9 @@ layout: default
 class: dark
 ---
 
-<div class="h-full flex flex-col justify-between py-2">
+<ObsDecor :series-y="-80" />
+
+<div class="relative z-10 h-full flex flex-col justify-between py-2">
 
 <div class="eyebrow">DEVPIRA Grafana Day · Piracicaba-SP</div>
 
@@ -576,7 +578,9 @@ Três perguntas para levar para casa e fazer para cada painel. De onde vem esse 
 class: dark
 ---
 
-<div class="h-full grid grid-cols-[3fr_2fr] gap-12 items-center">
+<ObsDecor :panels-y="34" />
+
+<div class="relative z-10 h-full grid grid-cols-[3fr_2fr] gap-12 items-center">
 
 <div class="flex flex-col gap-6">
 <div class="eyebrow">Perguntas</div>
