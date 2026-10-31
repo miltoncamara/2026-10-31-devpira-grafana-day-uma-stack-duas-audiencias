@@ -8,14 +8,14 @@ Slides da palestra de **Milton Camara** no **DEVPIRA Grafana Day 2026**, realiza
 
 Infraestrutura e negócio fazem perguntas diferentes sobre o mesmo sistema. A engenharia quer saber se o pod reiniciou, se a fila represou, se o disco vai encher. A operação quer saber se as mensagens do cliente saíram, se o SLA foi cumprido, se a campanha rodou.
 
-A palestra mostra como unificar as duas visões num único Grafana e, principalmente, o que esse Grafana esconde quando está mal configurado. O centro da apresentação são oito casos reais em que o dashboard estava verde e o sistema não estava bem.
+A palestra mostra como unificar as duas visões num único Grafana e, principalmente, o que esse Grafana esconde quando está mal configurado. A palestra também mostra como era antes, com painéis no portal do Azure e aplicações separadas lendo o banco para as métricas de negócio, e como ficou com dashboards, logs e alertas num único Grafana.
 
 ## Estrutura
 
 1. Abertura: as duas perguntas que o mesmo sistema recebe
 2. A stack: nove datasources, seis tecnologias e um painel só
 3. Camada técnica (Azure Monitor, Prometheus, Loki) e camada de negócio (SQL na réplica)
-4. O dashboard estava verde: oito casos reais
+4. Antes e depois: do portal do Azure e aplicações separadas para tudo no Grafana
 5. Como validar que o monitoramento mede de verdade
 6. Do alerta ao diagnóstico: um agente de IA que investiga o banco (coleta, acesso, harness, MCP) e o próximo passo no cluster
 7. Fechamento: questionar a própria fonte de dados

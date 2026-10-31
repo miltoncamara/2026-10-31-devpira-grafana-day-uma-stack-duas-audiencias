@@ -155,7 +155,7 @@ flowchart TB
 </div>
 
 <!--
-Por que não viraram seis ferramentas: porque o Grafana não armazena nada, ele só consulta. Cada fonte continua sendo a dona do seu dado. Azure Monitor para o que é gerenciado pelo Azure. Prometheus para o cluster. Loki para log de aplicação. SQL Server para o que o negócio pergunta. PostgreSQL e uma API JSON entram em casos pontuais. O Alertmanager fecha o ciclo mandando alerta para o Teams. Guarde esse Alertmanager, ele volta num dos casos.
+Por que não viraram seis ferramentas: porque o Grafana não armazena nada, ele só consulta. Cada fonte continua sendo a dona do seu dado. Azure Monitor para o que é gerenciado pelo Azure. Prometheus para o cluster. Loki para log de aplicação. SQL Server para o que o negócio pergunta. PostgreSQL e uma API JSON entram em casos pontuais. O Alertmanager fecha o ciclo mandando alerta para o Teams.
 -->
 
 ---
@@ -243,7 +243,7 @@ sum by (level) (
 </div>
 
 <!--
-CLEF é o formato JSON compacto do Serilog. No CLEF o nível Information é omitido por padrão, então a pipeline de coleta precisa normalizar: ausência de @l vira info, e os outros níveis viram um label padronizado. O trace_id fica como structured metadata do Loki e não como label, porque como label ele explode a cardinalidade do índice. Com isso dá para contar erro por aplicação e ainda pular do log para o trace. Esse label de nível é exatamente o que quebra no próximo bloco.
+CLEF é o formato JSON compacto do Serilog. No CLEF o nível Information é omitido por padrão, então a pipeline de coleta precisa normalizar: ausência de @l vira info, e os outros níveis viram um label padronizado. O trace_id fica como structured metadata do Loki e não como label, porque como label ele explode a cardinalidade do índice. Com isso dá para contar erro por aplicação e ainda pular do log para o trace.
 -->
 
 ---
@@ -293,179 +293,80 @@ class: accent
 ---
 
 <div class="h-full flex flex-col justify-center gap-6">
-<h1 class="statement" style="font-size:4.4rem">O dashboard<br>estava verde.</h1>
-<p class="text-2xl">Oito casos reais em que o monitoramento mentia.</p>
+<div class="eyebrow" style="color:#fbe3cc">O que mudou</div>
+<h1 class="statement" style="font-size:4.4rem">Antes,<br>dois mundos.</h1>
+<p class="text-2xl">Como a gente monitorava antes do Grafana.</p>
 </div>
 
 <!--
-Até aqui foi o tour. Agora a parte que importa. Todos os casos a seguir têm o mesmo formato: o painel dizia que estava tudo bem, e não estava. Nenhum deles gerou erro. Esse é o ponto: monitoramento quebrado raramente avisa que quebrou. Ele simplesmente fica quieto.
+Até aqui mostrei como está hoje. Agora quero mostrar de onde a gente saiu, porque é isso que explica por que valeu a pena juntar tudo.
 -->
 
 ---
 class: light
 ---
 
-<div class="eyebrow">Caso 1 · Kubernetes 1.34</div>
-
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">90%</div>
-<p class="soft text-lg mt-3">de uso no disco do Loki. Nenhum alerta disparou.</p>
-</div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Os alertas de disco cheio pararam de existir. Sem erro, sem aviso.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">Uma regressão no 1.34 sumiu com as métricas de volume do kubelet. Regra sem série não dispara.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">Alerta sem dado é alerta desligado.</p></div>
-</div>
-</div>
-
-<div class="footnote">Ref.: <a href="https://github.com/kubernetes/kubernetes/issues/133961">kubernetes/kubernetes#133961</a></div>
-
-<!--
-A partir do Kubernetes 1.34 as estatísticas de volume CSI deixaram de aparecer no kubelet, tanto no stats summary quanto no endpoint de métricas. Está registrado na issue 133961. Todas as regras de disco do kube-prometheus-stack dependem dessa família de métricas kubelet_volume_stats. Sem a série, a expressão retorna vazio e o Prometheus entende vazio como tudo certo. O disco do Loki chegou a 90 por cento em silêncio. A correção chegou num patch posterior da 1.34. Antes de citar a versão exata no palco, conferir no changelog oficial.
--->
-
----
-class: light
----
-
-<div class="eyebrow">Caso 2 · Helm e Promtail</div>
-
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">192/h</div>
-<p class="soft text-lg mt-3">erros de aplicação rotulados como “info”.</p>
-</div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Painel de erros limpo. Aplicação falhando.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">O Helm renderizou como dele o template Go da pipeline do Promtail. O nível virou sempre “info”.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">O erro deixou de existir como erro.</p></div>
-</div>
-</div>
-
-<div class="footnote">Dois motores de template Go no mesmo arquivo</div>
-
-<!--
-A pipeline do Promtail usa template Go para montar o label de nível. O values do Helm também é processado como template Go. Quando o template não está escapado, o Helm resolve as chaves antes, o resultado vira uma string fixa e todo log sai como info. Nenhum erro de deploy, nenhum erro de coleta. 192 erros por hora sumiram do painel de erros. A correção é escapar o template para o Helm, deixando as chaves passarem literais. Vale citar que o Promtail está em fim de vida e o caminho recomendado hoje é o Grafana Alloy, mas a armadilha de template continua a mesma.
--->
-
----
-class: light
----
-
-<div class="eyebrow">Caso 3 · Coletor OpenTelemetry</div>
-
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">73%</div>
-<p class="soft text-lg mt-3">da telemetria rejeitada. Cerca de 200 mil requisições por dia.</p>
-</div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Trace faltando aqui e ali. Ninguém foi alertado.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">Falha de autenticação no coletor. O log do erro existia, rotulado como “info”.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">Um defeito de observabilidade esconde o próximo.</p></div>
-</div>
-</div>
-
-<div class="footnote">Consequência direta do caso 2</div>
-
-<!--
-Esse caso só foi encontrado depois de corrigir o caso anterior. Quando o nível voltou a ser respeitado, apareceu uma enxurrada de erros de autenticação no coletor OpenTelemetry. 73 por cento do que as aplicações mandavam era rejeitado, perto de 200 mil requisições por dia jogadas fora. O erro sempre esteve no log. Só não estava classificado como erro. Defeitos de observabilidade se empilham: o primeiro esconde o segundo.
--->
-
----
-class: light
----
-
-<div class="eyebrow">Caso 4 · Alertmanager</div>
-
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">~100</div>
-<p class="soft text-lg mt-3">regras disparando para lugar nenhum. Por meses.</p>
-</div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Nenhum alerta no Teams. Parecia calmaria.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">O receptor padrão apontava para o vazio. As regras do kube-prometheus-stack disparavam sem destino.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">Silêncio no canal não é saúde. Teste a entrega.</p></div>
-</div>
-</div>
-
-<div class="footnote">O próprio chart traz um alerta Watchdog que dispara sempre</div>
-
-<!--
-O kube-prometheus-stack vem com mais ou menos cem regras prontas. Elas estavam avaliando e disparando normalmente. O problema estava depois: a rota padrão do Alertmanager mandava para um receptor sem nenhuma integração configurada. O Prometheus fazia a parte dele, o Alertmanager aceitava, e nada chegava em lugar nenhum. O chart inclui o alerta Watchdog, que fica disparando o tempo todo justamente para você confirmar que a entrega funciona. Se ele não chega, o problema é o caminho.
--->
-
----
-class: light
----
-
-<div class="eyebrow">Caso 5 · Deployment com disco</div>
-
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">RWO</div>
-<p class="soft text-lg mt-3">disco ReadWriteOnce com estratégia RollingUpdate.</p>
-</div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Rollout travado sem prazo. O pod velho seguia servindo configuração antiga.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">O pod novo não conseguia anexar o volume preso ao pod antigo.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">Pod rodando não é versão nova rodando.</p></div>
-</div>
-</div>
-
-<div class="footnote">Volume RWO em Deployment pede estratégia Recreate</div>
-
-<!--
-Esse é traiçoeiro porque nenhum painel de saúde fica vermelho. O pod antigo continua Running e Ready. O pod novo fica esperando o volume, que só pode ser anexado a um nó por vez. O RollingUpdate não derruba o antigo antes de o novo ficar pronto, então ninguém sai do lugar. Resultado: a configuração nova nunca entrou em produção e o painel mostrava tudo verde. Saída: estratégia Recreate, ou StatefulSet. E monitorar a condição de progresso do Deployment, porque o progressDeadlineSeconds marca o rollout como travado mas não reverte nada sozinho.
--->
-
----
-class: light
----
-
-<h2>Configuração aceita não é configuração funcionando</h2>
+<h2>Como era antes</h2>
 
 <div class="grid grid-cols-2 gap-8 mt-10">
 <div class="card flex flex-col gap-4">
-<div class="eyebrow">Caso 6 · Replace sem captura</div>
-<p class="text-xl">Um estágio de substituição de texto sem grupo de captura.</p>
-<p class="text-xl font-semibold">Presente, válido, aceito. Efeito nenhum.</p>
+<div class="eyebrow blue">Engenharia</div>
+<p class="text-2xl font-semibold">Painéis no portal do Azure</p>
+<p class="soft text-lg">A infraestrutura era acompanhada pelos painéis do próprio portal.</p>
 </div>
 <div class="card flex flex-col gap-4">
-<div class="eyebrow">Caso 7 · Agente ocioso</div>
-<p class="text-xl">Um agente de coleta num nó sem nada para coletar ficava sempre “não pronto”.</p>
-<p class="text-xl font-semibold">E congelava a atualização de todos os outros.</p>
+<div class="eyebrow">Negócio</div>
+<p class="text-2xl font-semibold">Aplicações próprias lendo o banco</p>
+<p class="soft text-lg">Cada métrica de negócio exigia código escrito, publicado e mantido.</p>
 </div>
 </div>
 
+<div v-click class="text-2xl font-semibold mt-10">Cada pergunta tinha um lugar diferente para olhar.</div>
+
 <!--
-Dois casos curtos que têm a mesma moral. O primeiro: no estágio replace da pipeline, a regex precisa de grupo de captura para saber o que substituir. Sem grupo, a configuração é válida, o agente sobe sem reclamar, e nada é substituído. O segundo: um agente de coleta rodando como DaemonSet num nó sem nada para ler nunca ficava pronto. Como a atualização do DaemonSet espera cada pod ficar pronto antes de seguir, um nó ocioso travou a atualização do cluster inteiro. Em nenhum dos dois apareceu erro.
+Antes, a engenharia acompanhava a infraestrutura pelos painéis do portal do Azure. Já as métricas de negócio, como volume por cliente e represamento, não estavam em painel nenhum: a gente criava aplicações separadas que liam o banco e mostravam os números. Cada métrica nova era código novo, deploy novo e mais uma aplicação para manter funcionando. E quem precisava cruzar as duas coisas tinha que abrir as duas.
+-->
+
+---
+class: dark
+---
+
+<div class="h-full flex flex-col justify-center gap-8">
+<h2 class="statement">Métrica de negócio nova<br>era aplicação nova.</h2>
+<p v-click class="text-4xl font-semibold hl">Hoje é uma consulta.</p>
+</div>
+
+<!--
+Esse é o ganho que mais aparece no dia a dia. Antes, para a diretoria ver um número novo, alguém tinha que escrever, publicar e manter uma aplicação. Hoje é uma consulta SQL num painel do Grafana, apontando para a réplica. Menos código para manter e o número fica do lado das métricas técnicas.
 -->
 
 ---
 class: light
 ---
 
-<div class="eyebrow">Caso 8 · Logs do ingress</div>
+<h2>Hoje: tudo no Grafana</h2>
 
-<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
-<div>
-<div class="big">200</div>
-<p class="soft text-lg mt-3">onde a resposta honesta seria 404.</p>
+<div class="grid grid-cols-4 gap-5 mt-10">
+<div class="card-top flex flex-col gap-3">
+<p class="text-2xl font-semibold">Dashboards</p>
+<p class="soft">Azure Monitor, Prometheus e SQL lado a lado no mesmo painel.</p>
 </div>
-<div class="flex flex-col gap-5">
-<div><div class="label">Sintoma</div><p class="text-xl mt-1">Varredura distribuída e coordenada, vinda de IPs de nuvem.</p></div>
-<div><div class="label">Causa</div><p class="text-xl mt-1">Aplicações respondendo 200 para caminhos que não existem.</p></div>
-<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">Log de ingress também é dado de segurança.</p></div>
+<div class="card-top flex flex-col gap-3">
+<p class="text-2xl font-semibold">Logs</p>
+<p class="soft">Loki com LogQL, no mesmo intervalo de tempo do gráfico.</p>
+</div>
+<div class="card-top flex flex-col gap-3">
+<p class="text-2xl font-semibold">Alertas</p>
+<p class="soft">Regras de alerta entregues no Teams pelo Alertmanager.</p>
+</div>
+<div class="card-top flex flex-col gap-3">
+<p class="text-2xl font-semibold">Acesso</p>
+<p class="soft">Entra ID e papéis por app role. Um login só.</p>
 </div>
 </div>
-
-<div class="footnote">Painel de taxa de erro: verde, porque 200 não é erro</div>
 
 <!--
-Olhando os logs do ingress no Loki apareceu um padrão de varredura distribuída, vários IPs de provedores de nuvem testando os mesmos caminhos de forma coordenada. O agravante: algumas aplicações respondiam 200 para qualquer caminho. Para um scanner automatizado, um 200 em caminho sensível é um sinal para investigar mais aquele host. E no painel de taxa de erro, tudo verde, porque 200 não conta como erro. Rota inexistente tem que devolver 404.
+Hoje está tudo num lugar só. Dashboards que juntam Azure Monitor, Prometheus e SQL no mesmo painel. Logs no Loki, consultados com LogQL ao lado do gráfico. Alertas entregues no Teams pelo Alertmanager. E um único controle de acesso, pelo Entra ID. Não é só conveniência: quando o volume de um cliente cai, dá para olhar o log de erro e o alerta no mesmo intervalo de tempo, sem trocar de ferramenta.
 -->
 
 ---
@@ -473,12 +374,12 @@ class: dark
 ---
 
 <div class="h-full flex flex-col justify-center gap-6">
-<div class="eyebrow">O padrão dos oito casos</div>
-<h2 class="statement">Ausência de sinal<br>não é ausência<br>de problema.</h2>
+<div class="eyebrow">O outro lado</div>
+<h2 class="statement">Um lugar só para olhar<br>também é um lugar só<br><span class="hl">para errar.</span></h2>
 </div>
 
 <!--
-Se eu tivesse que resumir os oito casos numa frase seria essa. Em nenhum deles alguma coisa ficou vermelha. Métrica que sumiu, nível que virou info, alerta sem destino, configuração sem efeito, rollout parado com pod saudável, 200 no lugar de 404. Todos são formas de silêncio. E o painel não distingue silêncio de saúde, a não ser que você ensine.
+Juntar tudo tem um custo que pouca gente comenta. Se uma fonte para de mandar dado, o painel não fica vermelho, ele simplesmente fica quieto. E ausência de sinal não é ausência de problema. Por isso, junto com a migração, a gente precisou de práticas para garantir que o painel mede de verdade.
 -->
 
 ---
@@ -507,7 +408,7 @@ class: light
 </div>
 
 <!--
-Quatro práticas que teriam pegado todos os casos. Primeira: para cada métrica de que um alerta depende, um alerta de ausência com a função absent do PromQL. Teria pegado o caso do Kubernetes. Segunda: um alerta que dispara sempre, como o Watchdog, com algo do lado de fora avisando quando ele para de chegar. Teria pegado o Alertmanager. Terceira: depois de toda mudança na pipeline de coleta, gerar um erro conhecido e verificar se ele aparece como erro. Teria pegado o Helm e o OpenTelemetry. Quarta: o coletor, o agente e o Alertmanager expõem métricas de descarte e falha. Olhe para elas.
+Quatro práticas para garantir que o painel unificado mede de verdade. Primeira: para cada métrica de que um alerta depende, um alerta de ausência com a função absent do PromQL. Se a métrica some, alguém fica sabendo. Segunda: um alerta que dispara sempre, como o Watchdog do kube-prometheus-stack, com algo do lado de fora avisando quando ele para de chegar. Terceira: depois de toda mudança na pipeline de coleta, gerar um erro conhecido e conferir se ele aparece como erro. Quarta: o coletor, o agente e o Alertmanager expõem métricas de descarte e falha. Olhe para elas.
 -->
 
 ---
@@ -638,7 +539,7 @@ class: light
 <div class="footnote">Métrica de saúde da coleta + absent(): coleta que para também alerta</div>
 
 <!--
-O coletor é um processo .NET pequeno. A cada raspagem do Prometheus ele chama uma única procedure no banco, que devolve várias grades de resultado: recursos, requisições, bloqueio, log de transação e esperas. Leva 18 milissegundos. Rótulo de lista fechada é para não repetir o erro de cardinalidade: nenhum rótulo é texto que vem do banco, como nome de consulta ou de login. E aplicamos a lição dos oito casos no próprio coletor: existe uma métrica de saúde da coleta e um alerta de ausência. Se o coletor parar, alguém fica sabendo. Ele só registra log quando falha ou quando volta, coleta com sucesso é silenciosa.
+O coletor é um processo .NET pequeno. A cada raspagem do Prometheus ele chama uma única procedure no banco, que devolve várias grades de resultado: recursos, requisições, bloqueio, log de transação e esperas. Leva 18 milissegundos. Rótulo de lista fechada é para não repetir o erro de cardinalidade: nenhum rótulo é texto que vem do banco, como nome de consulta ou de login. E aplicamos no próprio coletor a regra de monitorar o monitor: existe uma métrica de saúde da coleta e um alerta de ausência. Se o coletor parar, alguém fica sabendo. Ele só registra log quando falha ou quando volta, coleta com sucesso é silenciosa.
 -->
 
 ---
@@ -779,10 +680,10 @@ class: light
 </div>
 </div>
 
-<p v-click class="text-2xl font-semibold mt-12">Os oito casos desta palestra viram os primeiros playbooks.</p>
+<p v-click class="text-2xl font-semibold mt-12">Os incidentes do cluster viram os primeiros playbooks.</p>
 
 <!--
-O próximo passo é levar o mesmo agente para o cluster. O harness não muda: portão, contexto, catálogo fechado, laudo validado, pessoa no final. O que muda é o catálogo. Consultas fixas de Prometheus para o que mais aparece: pod reiniciando, rollout que não progride, volume enchendo, fila do KEDA. Loki com janela curta, porque log é caro de consultar. API do Kubernetes com uma service account só de leitura, que não lê Secret. E o histórico do GitOps, que no cluster faz o papel que as mudanças recentes fazem no banco: o que mudou e quando. Parte disso pode vir do próprio MCP do Grafana, desde que a lista de consultas continue fechada. E os oito casos que mostrei hoje viram os primeiros playbooks: o volume que sumiu, o nível que virou info, o rollout parado com pod saudável. Isto ainda está em construção, não está em produção.
+O próximo passo é levar o mesmo agente para o cluster. O harness não muda: portão, contexto, catálogo fechado, laudo validado, pessoa no final. O que muda é o catálogo. Consultas fixas de Prometheus para o que mais aparece: pod reiniciando, rollout que não progride, volume enchendo, fila do KEDA. Loki com janela curta, porque log é caro de consultar. API do Kubernetes com uma service account só de leitura, que não lê Secret. E o histórico do GitOps, que no cluster faz o papel que as mudanças recentes fazem no banco: o que mudou e quando. Parte disso pode vir do próprio MCP do Grafana, desde que a lista de consultas continue fechada. E os incidentes que já tivemos no cluster viram os primeiros playbooks. Isto ainda está em construção, não está em produção.
 -->
 
 ---
@@ -812,7 +713,7 @@ class: dark
 </div>
 
 <!--
-Três perguntas para levar para casa e fazer para cada painel. De onde vem esse número. Com quanto atraso ele chega. E a mais importante: o que acontece se ele sumir. Se a resposta da terceira for nada, o painel continua verde, então você tem um dos oito casos que mostrei esperando para acontecer.
+Três perguntas para levar para casa e fazer para cada painel. De onde vem esse número. Com quanto atraso ele chega. E a mais importante: o que acontece se ele sumir. Se a resposta da terceira for nada, o painel continua verde, então você tem um problema esperando para acontecer.
 -->
 
 ---
