@@ -50,10 +50,13 @@ class: dark
 <div class="flex flex-col gap-4">
 <div class="eyebrow">Quem fala</div>
 <h2 style="font-size:2.6rem">Milton Camara</h2>
-<p class="text-xl">Principal Software Architect</p>
-<p class="soft text-lg">Microsoft MVP em DevOps · Microsoft Certified Trainer</p>
-<p class="soft text-lg">Cofundador da comunidade Azure na Prática</p>
-<p class="mono soft text-sm mt-2">.NET · Azure · Kubernetes · Observabilidade</p>
+<div class="text-xl">Principal Software Architect</div>
+<div class="text-lg hl font-semibold">9x Microsoft MVP</div>
+<div class="flex flex-col gap-1 mt-2">
+<div class="soft text-lg">.NET, Azure, Kubernetes e DevOps</div>
+<div class="soft text-lg">Sistemas Distribuídos, Event-Driven e Observabilidade</div>
+<div class="soft text-lg">Applied AI (Agents, MCP)</div>
+</div>
 </div>
 
 </div>
