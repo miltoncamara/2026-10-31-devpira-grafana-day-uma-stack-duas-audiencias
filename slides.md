@@ -558,6 +558,244 @@ E o último caso fecha o raciocínio. Uma fila de um cliente com quase 4 mil men
 -->
 
 ---
+class: accent
+---
+
+<div class="h-full flex flex-col justify-center gap-6">
+<div class="eyebrow" style="color:#fbe3cc">Depois do painel</div>
+<h1 class="statement" style="font-size:4.4rem">Do alerta<br>ao diagnóstico.</h1>
+<p class="text-2xl">Um agente de IA que investiga o banco quando o alerta dispara.</p>
+</div>
+
+<!--
+Observabilidade boa termina em ação. O passo seguinte que demos foi este: quando um alerta crítico do banco dispara, um agente de IA investiga o banco na hora e entrega um laudo no mesmo canal do alerta. Ele não substitui ninguém e não executa nada: ele faz os primeiros dez minutos de investigação que alguém faria abrindo o notebook às seis da tarde. Vou mostrar como ele coleta, como ele entra no banco, como é o harness em volta do modelo e onde entram os MCPs.
+-->
+
+---
+class: dark
+---
+
+<h2>O caminho do alerta</h2>
+
+<div class="flow mt-10 flex flex-col gap-7">
+<div class="flex items-center gap-3">
+<span class="lane">Observar</span>
+<span class="node">Banco<br><small>procedures só leitura</small></span><span class="arr">→</span>
+<span class="node">Coletor<br><small>/metrics</small></span><span class="arr">→</span>
+<span class="node">Prometheus</span><span class="arr">→</span>
+<span class="node">Grafana</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="lane">Alertar</span>
+<span class="node">Regras</span><span class="arr">→</span>
+<span class="node">Alertmanager</span><span class="arr">→</span>
+<span class="node">Microsoft Teams</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="lane hl">Investigar</span>
+<span class="node">Webhook</span><span class="arr">→</span>
+<span class="node hot">Agente de diagnóstico</span><span class="arr">⇄</span>
+<span class="node">LLM</span><span class="arr">+</span>
+<span class="node">Ferramentas<br><small>banco · APM · código</small></span><span class="arr">→</span>
+<span class="node hot">Laudo no Teams</span>
+</div>
+</div>
+
+<style>
+.flow .lane { width: 7.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gd-soft-dark); }
+.flow .lane.hl { color: var(--gd-accent-dark); }
+.flow .node { border: 1px solid #3a4250; border-radius: 10px; padding: 0.55rem 0.9rem; font-size: 1.05rem; line-height: 1.2; text-align: center; }
+.flow .node small { color: var(--gd-soft-dark); font-size: 0.75rem; }
+.flow .node.hot { border-color: var(--gd-accent-dark); color: var(--gd-accent-dark); font-weight: 600; }
+.flow .arr { color: var(--gd-soft-dark); font-size: 1.2rem; }
+</style>
+
+<!--
+O desenho cabe num slide. Um coletor lê o banco e expõe as métricas no formato Prometheus. O Prometheus raspa, o Grafana mostra e as regras avaliam. Quando uma regra crítica do banco dispara, o Alertmanager manda para o Teams, como sempre, e também chama um webhook do agente. O agente então conversa com o modelo e usa ferramentas: as mesmas procedures do banco, o APM para saber se o cliente está sentindo e a busca no código-fonte para achar de onde vem a consulta. O laudo volta para o mesmo canal do alerta. Repare que o agente reaproveita a stack inteira que mostrei antes: nada foi construído do lado.
+-->
+
+---
+class: light
+---
+
+<div class="eyebrow blue">Agente · Coleta</div>
+
+<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
+<div>
+<div class="big">18 ms</div>
+<p class="soft text-lg mt-3">por coleta. Uma procedure, várias grades de resultado.</p>
+</div>
+<div class="flex flex-col gap-5">
+<div><div class="label">O que mede</div><p class="text-xl mt-1">CPU, workers, sessões, fila de bloqueio, bloqueador ocioso, log de transação, esperas.</p></div>
+<div><div class="label">Como</div><p class="text-xl mt-1">Cerca de 40 séries, com rótulos de lista fechada. Nenhum rótulo vem de texto livre do banco.</p></div>
+<div><div class="label accent">Regra da casa</div><p class="text-xl mt-1 font-semibold">O coletor é o primeiro a ser monitorado.</p></div>
+</div>
+</div>
+
+<div class="footnote">Métrica de saúde da coleta + absent(): coleta que para também alerta</div>
+
+<!--
+O coletor é um processo .NET pequeno. A cada raspagem do Prometheus ele chama uma única procedure no banco, que devolve várias grades de resultado: recursos, requisições, bloqueio, log de transação e esperas. Leva 18 milissegundos. Rótulo de lista fechada é para não repetir o erro de cardinalidade: nenhum rótulo é texto que vem do banco, como nome de consulta ou de login. E aplicamos a lição dos oito casos no próprio coletor: existe uma métrica de saúde da coleta e um alerta de ausência. Se o coletor parar, alguém fica sabendo. Ele só registra log quando falha ou quando volta, coleta com sucesso é silenciosa.
+-->
+
+---
+class: light
+---
+
+<div class="eyebrow blue">Agente · Acesso ao banco</div>
+
+<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
+<div>
+<div class="big">0</div>
+<p class="soft text-lg mt-3">senhas de banco. Nem no código, nem no cofre.</p>
+</div>
+<div class="flex flex-col gap-5">
+<div><div class="label">Identidade</div><p class="text-xl mt-1">O pod troca a identidade da carga por um token do Entra ID.</p></div>
+<div><div class="label">Permissão</div><p class="text-xl mt-1">Só EXECUTE num schema próprio de procedures de leitura. Tabela de negócio: acesso negado.</p></div>
+<div><div class="label accent">Antes do modelo</div><p class="text-xl mt-1 font-semibold">Literais e segredos saem do texto SQL.</p></div>
+</div>
+</div>
+
+<div class="footnote">Timeout de 20 s volta para o modelo como evidência, não como erro</div>
+
+<!--
+Esse é o slide que o pessoal de segurança pergunta. O agente não tem usuário e senha. O pod usa Workload Identity: a service account do Kubernetes é federada com uma identidade gerenciada, que pega um token do Entra ID, e o banco aceita esse token. No banco, o usuário dessa identidade só pode executar procedures de um schema próprio, todas de leitura de DMV. Testamos com EXECUTE AS: ler tabela de cliente dá acesso negado. Antes de qualquer texto ir para o modelo, um filtro tira os literais do SQL, que podem ter dado pessoal, e qualquer coisa com cara de segredo. As procedures rodam com plano fixo e MAXDOP 1, para não competir com a carga que estão investigando. E se o banco não responder em 20 segundos, isso volta para o modelo como evidência: num dos incidentes, até a investigação ficou na fila de compilação, e isso dizia muito sobre o problema.
+-->
+
+---
+class: light
+---
+
+<div class="eyebrow blue">Agente · Harness</div>
+<h2 class="mt-2">O modelo decide o que olhar.<br>O código decide o que ele pode.</h2>
+
+<div class="grid grid-cols-5 gap-3 mt-8">
+<div class="card-top flex flex-col gap-2">
+<p class="label">1 · Portão</p>
+<p class="text-base">Só alerta crítico. 1 por alerta a cada 30 min, 4 por hora, 20 por dia.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="label">2 · Contexto</p>
+<p class="text-base">Princípios e playbooks dos incidentes anteriores.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="label">3 · Ferramentas</p>
+<p class="text-base">Catálogo fechado: 12 de leitura e 1 de entrega.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="label">4 · Laudo</p>
+<p class="text-base">Formato validado: severidade, ação, o que não foi verificado.</p>
+</div>
+<div class="card-top biz flex flex-col gap-2">
+<p class="label accent">5 · Pessoa</p>
+<p class="text-base font-semibold">Quem executa a ação é sempre gente.</p>
+</div>
+</div>
+
+<div class="footnote">≈ 45 s e ≈ US$ 0,20 por diagnóstico · regressão com fotos de incidentes reais, às cegas</div>
+
+<!--
+Harness é tudo que fica em volta do modelo, e é onde está a maior parte do trabalho. Primeiro um portão: só alerta crítico do banco, com teto de custo, um diagnóstico por vez. Depois o contexto: um prompt de sistema com princípios aprendidos nos incidentes e um playbook por incidente anterior. Aí o modelo entra num laço de tool use, com no máximo 15 rodadas e 5 minutos: ele escolhe quais ferramentas chamar, de um catálogo fechado que a gente escreveu. Nenhuma ferramenta escreve nada. O laço só termina quando o modelo entrega o laudo pela ferramenta de entrega, num formato validado: severidade, confiança, incidente parecido, ação imediata e uma seção obrigatória do que ele não conseguiu verificar. O laudo vira um card no Teams. O modelo hoje é o Claude, pela API da Anthropic, mas a camada de provedor é trocável. E o mais importante: tratamos o agente como código. Cada incidente vira uma foto, com os dados reais daquele momento, e a regressão roda o agente nessas fotos às cegas, com o playbook do próprio incidente escondido.
+-->
+
+---
+class: light
+---
+
+<div class="eyebrow">30/10, 18h46 · O agente em produção</div>
+
+<div class="grid grid-cols-[2fr_3fr] gap-12 items-center mt-10">
+<div>
+<div class="big">966</div>
+<p class="soft text-lg mt-3">requisições disputando a mesma linha do banco.</p>
+</div>
+<div class="flex flex-col gap-5">
+<div><div class="label">Acertou</div><p class="text-xl mt-1">Não há bloqueador ocioso. Não mate sessão, não escale: o gargalo é o lock, não a CPU.</p></div>
+<div><div class="label">Errou</div><p class="text-xl mt-1">“Nenhum incidente parecido.” O mesmo tinha acontecido na véspera.</p></div>
+<div><div class="label accent">Lição</div><p class="text-xl mt-1 font-semibold">O agente só lembra do que alguém escreveu.</p></div>
+</div>
+</div>
+
+<div class="footnote">O playbook do incidente da véspera foi escrito na mesma noite</div>
+
+<!--
+Caso de 30 de outubro, véspera desta palestra, no fim da tarde. Alerta de bloqueio persistente às 18h46. O laudo chegou no canal: quase mil requisições do serviço de chatbot disputando o mesmo UPDATE, numa única linha do cadastro de um cliente. Ele acertou o que mais importa no calor do momento: todos os bloqueadores estavam rodando, nenhum ocioso com transação esquecida, então matar sessão só passa o lock para a próxima da fila, e a CPU estava em 44%, então escalar não resolve. Ele também apontou o risco real, que era esgotar os workers do banco. Mas errou numa coisa: disse que não havia incidente parecido. Tinha, na véspera, mesma assinatura, mesmo cliente. Só que ninguém tinha escrito o playbook. A ferramenta não mostra o recurso do lock, então quem confirmou qual cliente era foi uma pessoa, rodando um script de leitura. O playbook foi escrito na mesma noite. É o tema desta palestra de novo: o agente não sabe o que ele não sabe.
+-->
+
+---
+class: dark
+---
+
+<div class="eyebrow">Investigação interativa · MCP</div>
+<h2 class="mt-2">Na investigação, a IA conversa com as mesmas fontes</h2>
+
+<div class="grid grid-cols-3 gap-6 mt-10">
+<div class="flex flex-col gap-2 pt-4" style="border-top:2px solid #3a4250">
+<p class="text-2xl font-semibold">Grafana</p>
+<p class="soft text-lg">PromQL, LogQL, painéis e regras de alerta.</p>
+</div>
+<div class="flex flex-col gap-2 pt-4" style="border-top:2px solid #3a4250">
+<p class="text-2xl font-semibold">APM</p>
+<p class="soft text-lg">O cliente está sentindo? Latência e erro por minuto.</p>
+</div>
+<div class="flex flex-col gap-2 pt-4" style="border-top:2px solid #3a4250">
+<p class="text-2xl font-semibold">Azure DevOps</p>
+<p class="soft text-lg">Código, cards e pull requests.</p>
+</div>
+</div>
+
+<p v-click class="text-2xl font-semibold hl mt-12">A IA consulta e propõe. No banco, quem executa é a pessoa.</p>
+
+<!--
+O agente automático usa ferramentas fixas, escritas em código, porque roda sozinho às seis da tarde. Na investigação com alguém do lado o desenho é outro: um assistente de código com servidores MCP. O MCP do Grafana dá acesso ao Prometheus, ao Loki, aos painéis e às regras de alerta. Foi por ele que conferimos ontem a fila caindo minuto a minuto. O do APM responde se o cliente está sentindo. O do Azure DevOps acha o código, abre o card e o pull request. A regra que a gente segue: a IA consulta e propõe, mas no banco de produção ela não executa nada, nem leitura. Ela entrega o script e uma pessoa roda. Ontem o script que confirmou o cliente foi escrito pela IA e executado por gente.
+-->
+
+---
+class: light
+---
+
+<div class="eyebrow blue">Próximo passo · O cluster</div>
+<h2 class="mt-2">Mesmo harness, outro catálogo de ferramentas</h2>
+
+<div class="grid grid-cols-4 gap-5 mt-10">
+<div class="card-top flex flex-col gap-2">
+<p class="text-xl font-semibold">Prometheus</p>
+<p class="soft">Consultas fixas: reinício, rollout parado, volume, fila do KEDA.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="text-xl font-semibold">Loki</p>
+<p class="soft">Erro por aplicação e padrões de log, janela curta.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="text-xl font-semibold">API do Kubernetes</p>
+<p class="soft">Só leitura: eventos, pods, deployments. Sem acesso a Secret.</p>
+</div>
+<div class="card-top flex flex-col gap-2">
+<p class="text-xl font-semibold">GitOps</p>
+<p class="soft">O que mudou no cluster e quando.</p>
+</div>
+</div>
+
+<p v-click class="text-2xl font-semibold mt-12">Os oito casos desta palestra viram os primeiros playbooks.</p>
+
+<!--
+O próximo passo é levar o mesmo agente para o cluster. O harness não muda: portão, contexto, catálogo fechado, laudo validado, pessoa no final. O que muda é o catálogo. Consultas fixas de Prometheus para o que mais aparece: pod reiniciando, rollout que não progride, volume enchendo, fila do KEDA. Loki com janela curta, porque log é caro de consultar. API do Kubernetes com uma service account só de leitura, que não lê Secret. E o histórico do GitOps, que no cluster faz o papel que as mudanças recentes fazem no banco: o que mudou e quando. Parte disso pode vir do próprio MCP do Grafana, desde que a lista de consultas continue fechada. E os oito casos que mostrei hoje viram os primeiros playbooks: o volume que sumiu, o nível que virou info, o rollout parado com pod saudável. Isto ainda está em construção, não está em produção.
+-->
+
+---
+class: dark
+---
+
+<div class="h-full flex flex-col justify-center gap-8">
+<div class="eyebrow">A primeira regra do prompt</div>
+<h2 class="statement">Campo nulo é<br>“não medido”.<br><span class="hl">Nunca “tudo bem”.</span></h2>
+</div>
+
+<!--
+Para fechar o bloco do agente, a regra que mais pesou no prompt dele é exatamente a tese desta palestra. Campo nulo significa não medido, não zero e não "não aconteceu". O agente não pode afirmar nada a partir de um dado ausente, e tem que listar o que não conseguiu medir no laudo. Nos primeiros testes o modelo afirmou que o banco tinha reiniciado a partir de um campo vazio. Foi a mesma armadilha do painel verde, agora dentro de um modelo de linguagem. Se a máquina precisa dessa regra escrita, a gente também precisa.
+-->
+
+---
 class: dark
 ---
 

@@ -17,7 +17,8 @@ A palestra mostra como unificar as duas visões num único Grafana e, principalm
 3. Camada técnica (Azure Monitor, Prometheus, Loki) e camada de negócio (SQL na réplica)
 4. O dashboard estava verde: oito casos reais
 5. Como validar que o monitoramento mede de verdade
-6. Fechamento: questionar a própria fonte de dados
+6. Do alerta ao diagnóstico: um agente de IA que investiga o banco (coleta, acesso, harness, MCP) e o próximo passo no cluster
+7. Fechamento: questionar a própria fonte de dados
 
 ## Como rodar
 
